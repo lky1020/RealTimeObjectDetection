@@ -1,3 +1,5 @@
+import time
+
 import tensorflow as tf
 from object_detection.utils import config_util
 from object_detection.protos import pipeline_pb2
@@ -6,9 +8,17 @@ import os
 from object_detection.utils import label_map_util
 from object_detection.utils import visualization_utils as viz_utils
 from object_detection.builders import model_builder
+import HandTrackingModule as htm
 
 import cv2
 import numpy as np
+
+# Used to calculate FPS
+prevTime = 0
+currentTime = 0
+
+# create mediapipe object
+detector = htm.handDetector()
 
 # Setup Path
 WORKSPACE_PATH = 'Tensorflow/workspace'
@@ -68,7 +78,7 @@ detection_model = model_builder.build(model_config=configs['model'], is_training
 
 # Restore checkpoint
 ckpt = tf.compat.v2.train.Checkpoint(model=detection_model)
-ckpt.restore(os.path.join(CHECKPOINT_PATH, 'ckpt-6')).expect_partial()
+ckpt.restore(os.path.join(CHECKPOINT_PATH, 'ckpt-11')).expect_partial()
 
 @tf.function
 def detect_fn(image):
@@ -87,6 +97,7 @@ height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
 while True:
     ret, frame = cap.read()
+    frame = detector.findHands(frame)
     image_np = np.array(frame)
 
     input_tensor = tf.convert_to_tensor(np.expand_dims(image_np, 0), dtype=tf.float32)
@@ -113,6 +124,12 @@ while True:
         max_boxes_to_draw=5,
         min_score_thresh=.5,
         agnostic_mode=False)
+
+    currentTime = time.time()
+    fps = 1 / (currentTime - prevTime)
+    prevTime = currentTime
+
+    cv2.putText(image_np_with_detections, str(int(fps)), (10, 50), cv2.FONT_HERSHEY_PLAIN, 3, (255, 255, 0), 2)
 
     cv2.imshow('object detection', cv2.resize(image_np_with_detections, (800, 600)))
 
